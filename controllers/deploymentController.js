@@ -58,10 +58,42 @@ class DeploymentController {
     if (packageJsonExists) {
       const installSuccess = await DeploymentController.installNodeDependencies(targetDir);
       if (installSuccess) {
-        res.json({ 
-          message: "Files extracted and dependencies installed successfully", 
-          filePath: targetDir 
-        });
+        // Check if 'deploy' script exists in package.json
+        const packageJsonPath = path.join(targetDir, "package.json");
+        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
+        if (packageJson.scripts && packageJson.scripts.deploy) {
+          try {
+            console.log("Running 'npm run deploy' script...");
+            const { stdout, stderr } = await execPromise("npm run deploy", { cwd: targetDir });
+            console.log(stdout);
+            if (stderr) {
+              console.error(stderr);
+              res.json({ 
+                message: "Files extracted and dependencies installed successfully, but 'npm run deploy' encountered warnings", 
+                filePath: targetDir,
+                warning: "Warnings during 'npm run deploy'"
+              });
+            } else {
+              res.json({ 
+                message: "Files extracted, dependencies installed, and 'npm run deploy' executed successfully", 
+                filePath: targetDir 
+              });
+            }
+          } catch (err) {
+            console.error("Failed to execute 'npm run deploy':", err);
+            res.json({ 
+              message: "Files extracted and dependencies installed successfully, but 'npm run deploy' failed", 
+              filePath: targetDir,
+              warning: "Failed to execute 'npm run deploy'"
+            });
+          }
+        } else {
+          res.json({ 
+            message: "Files extracted and dependencies installed successfully", 
+            filePath: targetDir,
+            warning: "No 'deploy' script found in package.json"
+          });
+        }
       } else {
         res.json({ 
           message: "Files extracted successfully, but dependency installation failed", 
