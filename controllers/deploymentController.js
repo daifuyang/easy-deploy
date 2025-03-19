@@ -151,11 +151,15 @@ class DeploymentController {
 
       // Process file based on its type
       const originalnameLower = deployFile.originalname.toLowerCase();
-      
+
       if (originalnameLower.endsWith(".zip")) {
         try {
+          // Ensure extractZip completes before proceeding
           await fileUtils.extractZip(tempPath, targetDir);
-          
+
+          // Log completion of extraction for debugging purposes
+          console.log("Zip extraction completed successfully");
+
           // For Node.js applications, install dependencies
           if (type.toLowerCase() === "node") {
             await DeploymentController.processNodeApplication(targetDir, res);

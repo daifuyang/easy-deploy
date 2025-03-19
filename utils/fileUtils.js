@@ -53,20 +53,46 @@ function deleteFolderRecursive(folderPath) {
  * @param {string} targetDir - Target directory for extraction
  * @returns {Promise} - Resolves when extraction is complete
  */
-function extractZip(filePath, targetDir) {
-  return new Promise((resolve, reject) => {
-    fs.createReadStream(filePath)
-      .pipe(unzipper.Extract({ path: targetDir }))
-      .on("close", () => {
-        fs.unlinkSync(filePath); // Delete temporary file
-        resolve();
-      })
-      .on("error", (err) => {
-        console.error("Unzip failed:", err);
-        fs.unlinkSync(filePath); // Delete temporary file
-        reject(err);
-      });
-  });
+async function extractZip(filePath, targetDir) {
+  try {
+    console.log(`Extracting ZIP file from ${filePath} to ${targetDir}`);
+    
+    // Open the zip file for parsing
+    const directory = await unzipper.Open.file(filePath);
+    
+    // Extract all files
+    let extractedCount = 0;
+    for (const file of directory.files) {
+      // Skip directories, they'll be created when extracting files
+      if (file.type === 'Directory') continue;
+      
+      const outputPath = path.join(targetDir, file.path);
+      const outputDir = path.dirname(outputPath);
+      
+      // Create directory if it doesn't exist
+      if (!fs.existsSync(outputDir)) {
+        fs.mkdirSync(outputDir, { recursive: true });
+      }
+      
+      // Extract file
+      const content = await file.buffer();
+      fs.writeFileSync(outputPath, content);
+      extractedCount++;
+    }
+    
+    console.log(`ZIP extraction complete: extracted ${extractedCount} files.`);
+    
+    // Delete temporary file
+    fs.unlinkSync(filePath);
+    return Promise.resolve();
+  } catch (err) {
+    console.error("Unzip failed:", err);
+    // Only delete the temporary file if it exists
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+    return Promise.reject(err);
+  }
 }
 
 /**
