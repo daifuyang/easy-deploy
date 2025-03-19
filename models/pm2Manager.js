@@ -31,51 +31,20 @@ class PM2Manager {
   /**
    * Start a new application or restart existing one
    * @param {string} projectName - Name of the project
-   * @param {string} scriptPath - Path to the script (only required for new projects)
+   * @param {string} scriptPath - Path to the script
    * @returns {Promise} - Resolves with process information
    */
-  static async start(projectName, scriptPath) {
-    try {
-      const existingProcess = await this.describe(projectName);
-      
-      if (existingProcess.length === 0) {
-        // Application doesn't exist, create a new one
-        if (!scriptPath) {
-          throw new Error("Script path is required for new project");
+  static start(params) {
+    return new Promise((resolve, reject) => {
+      pm2.start(params, (err, proc) => {
+        if (err) {
+          console.error("PM2 start failed:", err);
+          reject(err);
+          return;
         }
-        
-        return new Promise((resolve, reject) => {
-          pm2.start(
-            {
-              name: projectName,
-              script: scriptPath
-            },
-            (err, proc) => {
-              if (err) {
-                console.error("PM2 start failed:", err);
-                reject(err);
-                return;
-              }
-              resolve(proc);
-            }
-          );
-        });
-      } else {
-        // Application exists, restart it
-        return new Promise((resolve, reject) => {
-          pm2.start(projectName, (err, proc) => {
-            if (err) {
-              console.error("PM2 start failed:", err);
-              reject(err);
-              return;
-            }
-            resolve(proc);
-          });
-        });
-      }
-    } catch (err) {
-      throw err;
-    }
+        resolve(proc);
+      });
+    });
   }
 
   /**
@@ -175,7 +144,7 @@ class PM2Manager {
   static async getStatus(projectName) {
     try {
       const processDescription = await this.describe(projectName);
-      
+
       if (processDescription.length === 0) {
         throw new Error(`Project ${projectName} not found`);
       }

@@ -1,4 +1,6 @@
+const path = require("path");
 const PM2Manager = require("../models/pm2Manager");
+const config = require("../config");
 
 /**
  * PM2Controller handles PM2 process management operations
@@ -11,12 +13,13 @@ class PM2Controller {
    */
   static async manage(req, res) {
     const { action, projectName, scriptPath } = req.body;
+    const userName = req.user?.name;
 
     if (!action || !["start", "stop", "restart", "delete", "list", "status"].includes(action)) {
       return res.status(400).json({ error: "Invalid action" });
     }
 
-    if (action !== "list" && !projectName) {
+    if (action !== "list" && action !== "start" && !projectName) {
       return res.status(400).json({ error: "Project name is required" });
     }
 
@@ -25,21 +28,29 @@ class PM2Controller {
 
       switch (action) {
         case "start":
-          if (action === "start" && !scriptPath) {
-            const processDescription = await PM2Manager.describe(projectName);
-            if (processDescription.length === 0) {
-              PM2Manager.disconnect();
-              return res.status(400).json({ error: "Script path is required for new project" });
-            }
+          if (!scriptPath) {
+            PM2Manager.disconnect();
+            return res.status(400).json({ error: "Script path is required" });
           }
 
-          const proc = await PM2Manager.start(projectName, scriptPath);
+          // Get authorized path for the current user
+          if (!userName || !config.authorizedUsers[userName]) {
+            PM2Manager.disconnect();
+            return res.status(403).json({ error: "User not authorized" });
+          }
+
+          // Construct the absolute script path by combining the authorized path with the relative script path
+          const userAuthorizedPath = Array.isArray(config.authorizedUsers[userName]) 
+            ? config.authorizedUsers[userName][0] 
+            : config.authorizedUsers[userName];
+          
+          const absoluteScriptPath = path.join(userAuthorizedPath, scriptPath);
+
+          const params = require(absoluteScriptPath);
+          
+          const proc = await PM2Manager.start(params);
           res.json({ 
-            message: `Project ${projectName} ${
-              (await PM2Manager.describe(projectName)).length > 1 
-                ? "started" 
-                : "restarted"
-            } successfully`, 
+            message: `Project ${projectName || scriptPath} started successfully`, 
             proc 
           });
           break;
