@@ -146,8 +146,6 @@ class DeploymentController {
       // Delete all files in target directory
       fileUtils.deleteFolderRecursive(targetDir, ["node_modules"]);
 
-      return res.json({ message: "File uploaded successfully" });
-
       // Ensure target directory exists
       fs.mkdirSync(targetDir, { recursive: true });
 
