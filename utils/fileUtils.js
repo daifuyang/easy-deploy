@@ -34,23 +34,38 @@ function isPathAuthorized(targetDir, subDir, authorizedPaths) {
  * @param {Array<string>} excludePaths - List of relative paths to exclude from deletion
  */
 function deleteFolderRecursive(folderPath, excludePaths = []) {
-  if (fs.existsSync(folderPath)) {
-    fs.readdirSync(folderPath).forEach((file) => {
-      const filePath = path.join(folderPath, file);
-      const relativeFilePath = path.relative(folderPath, filePath);
-      // Skip excluded directories and files
-      if (excludePaths.includes(relativeFilePath)) {
-        console.log(`Skipping excluded path: ${relativeFilePath}`);
-      }else {
-      const fileStat = fs.statSync(filePath);
-      if (fileStat.isDirectory()) {
-        deleteFolderRecursive(filePath, excludePaths); // Recursively delete subdirectories
-      } else {
-        fs.unlinkSync(filePath); // Delete file
-        console.log("delete file success:", filePath)
-      }
-    }
+  if (!fs.existsSync(folderPath)) {
+    return;
+  }
+
+  const files = fs.readdirSync(folderPath);
+
+  files.forEach((file) => {
+    const filePath = path.join(folderPath, file);
+
+    // Resolve the full path of the file
+    const resolvedFilePath = path.resolve(filePath);
+
+    // Check if the file path is in the exclude list
+    const isExcluded = excludePaths.some((excludePath) => {
+      const resolvedExcludePath = path.resolve(folderPath, excludePath);
+      return resolvedFilePath.startsWith(resolvedExcludePath);
     });
+
+    if (isExcluded) {
+      return;
+    }
+
+    if (fs.statSync(filePath).isDirectory()) {
+      deleteFolderRecursive(filePath, excludePaths);
+    } else {
+      fs.unlinkSync(filePath);
+    }
+  });
+
+  // Check if the folder is empty and delete it
+  if (fs.readdirSync(folderPath).length === 0) {
+    fs.rmdirSync(folderPath);
   }
 }
 
