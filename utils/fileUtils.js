@@ -29,21 +29,28 @@ function isPathAuthorized(targetDir, subDir, authorizedPaths) {
 }
 
 /**
- * Recursively deletes a folder and all its contents
+ * Recursively deletes a folder and all its contents, excluding specified directories
  * @param {string} folderPath - Path to the folder to delete
+ * @param {Array<string>} excludePaths - List of relative paths to exclude from deletion
  */
-function deleteFolderRecursive(folderPath) {
+function deleteFolderRecursive(folderPath, excludePaths = []) {
   if (fs.existsSync(folderPath)) {
     fs.readdirSync(folderPath).forEach((file) => {
       const filePath = path.join(folderPath, file);
+      const relativeFilePath = path.relative(folderPath, filePath);
+      // Skip excluded directories and files
+      if (excludePaths.includes(relativeFilePath)) {
+        console.log(`Skipping excluded path: ${relativeFilePath}`);
+      }else {
       const fileStat = fs.statSync(filePath);
       if (fileStat.isDirectory()) {
-        deleteFolderRecursive(filePath); // Recursively delete subdirectories
+        deleteFolderRecursive(filePath, excludePaths); // Recursively delete subdirectories
       } else {
         fs.unlinkSync(filePath); // Delete file
+        console.log("delete file success:", filePath)
       }
+    }
     });
-    fs.rmdirSync(folderPath); // Delete empty directory
   }
 }
 
@@ -56,32 +63,32 @@ function deleteFolderRecursive(folderPath) {
 async function extractZip(filePath, targetDir) {
   try {
     console.log(`Extracting ZIP file from ${filePath} to ${targetDir}`);
-    
+
     // Open the zip file for parsing
     const directory = await unzipper.Open.file(filePath);
-    
+
     // Extract all files
     let extractedCount = 0;
     for (const file of directory.files) {
       // Skip directories, they'll be created when extracting files
-      if (file.type === 'Directory') continue;
-      
+      if (file.type === "Directory") continue;
+
       const outputPath = path.join(targetDir, file.path);
       const outputDir = path.dirname(outputPath);
-      
+
       // Create directory if it doesn't exist
       if (!fs.existsSync(outputDir)) {
         fs.mkdirSync(outputDir, { recursive: true });
       }
-      
+
       // Extract file
       const content = await file.buffer();
       fs.writeFileSync(outputPath, content);
       extractedCount++;
     }
-    
+
     console.log(`ZIP extraction complete: extracted ${extractedCount} files.`);
-    
+
     // Delete temporary file
     fs.unlinkSync(filePath);
     return Promise.resolve();
